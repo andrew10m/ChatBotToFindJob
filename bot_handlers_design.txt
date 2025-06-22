@@ -1,0 +1,206 @@
+## Telegram Bot Handlers and Conversation Flow Design (Russian Language Interface)
+
+**Libraries**: `python-telegram-bot`
+
+**States for ConversationHandler**:
+- `CHOOSE_ROLE`
+- `EMPLOYER_ACTIONS`
+- `JOB_SEEKER_ACTIONS`
+- `ADMIN_ACTIONS`
+- `REGISTER_EMPLOYER_AGREEMENT`
+- `REGISTER_JOB_SEEKER_AGREEMENT`
+- `POST_VACANCY_TITLE`
+- `POST_VACANCY_DESCRIPTION`
+- `POST_VACANCY_SALARY`
+- `POST_VACANCY_CONTACTS`
+- `POST_VACANCY_CONFIRM`
+- `VIEW_VACANCIES_LIST`
+- `APPLY_VACANCY_CONFIRM_AGREEMENT`
+- `APPLY_VACANCY_SUBMIT_INFO`
+- `FILTER_VACANCIES_KEYWORDS`
+- `MODERATE_VACANCY_ID`
+
+---
+
+**I. General Commands & Handlers:**
+
+1.  **`/start` or `/старт` (CommandHandler)**
+    *   **Action**: Greets the user. Checks if the user exists in the DB.
+        *   If new user: "Добро пожаловать! Пожалуйста, выберите вашу роль: Работодатель или Соискатель?" (Welcome! Please choose your role: Employer or Job Seeker?) -> `CHOOSE_ROLE` state.
+            *   Buttons: ["Я Работодатель", "Я Соискатель"]
+        *   If existing user (role chosen):
+            *   Employer: "С возвращением, Работодатель! Что бы вы хотели сделать?" (Welcome back, Employer! What would you like to do?) -> `EMPLOYER_ACTIONS` state.
+                *   Buttons: ["Опубликовать вакансию", "Мои вакансии", "Просмотреть кандидатов"]
+            *   Job Seeker: "С возвращением, Соискатель! Что бы вы хотели сделать?" (Welcome back, Job Seeker! What would you like to do?) -> `JOB_SEEKER_ACTIONS` state.
+                *   Buttons: ["Смотреть вакансии", "Мои отклики", "Фильтр вакансий"]
+            *   Admin: "Панель администратора." (Admin Panel) -> `ADMIN_ACTIONS` state.
+                *   Buttons: ["Модерация вакансий", "Управление пользователями"]
+    *   **Conversation State**: Transitions to `CHOOSE_ROLE`, `EMPLOYER_ACTIONS`, `JOB_SEEKER_ACTIONS`, or `ADMIN_ACTIONS`.
+
+2.  **Role Selection (CallbackQueryHandler from `/start` for new users)**
+    *   **State**: `CHOOSE_ROLE`
+    *   **Action**: User clicks "Я Работодатель" or "Я Соискатель".
+        *   "Я Работодатель":
+            *   Display General User Agreement (Russian). "Пожалуйста, ознакомьтесь с Пользовательским соглашением... Принимаете условия?" (Please review the User Agreement... Do you accept the terms?)
+            *   Buttons: ["✅ Принимаю", "❌ Отклоняю"]
+            *   **Conversation State**: `REGISTER_EMPLOYER_AGREEMENT`
+        *   "Я Соискатель":
+            *   Display General User Agreement (Russian). "Пожалуйста, ознакомьтесь с Пользовательским соглашением... Принимаете условия?"
+            *   Buttons: ["✅ Принимаю", "❌ Отклоняю"]
+            *   **Conversation State**: `REGISTER_JOB_SEEKER_AGREEMENT`
+
+3.  **General Agreement Acceptance (CallbackQueryHandler)**
+    *   **States**: `REGISTER_EMPLOYER_AGREEMENT`, `REGISTER_JOB_SEEKER_AGREEMENT`
+    *   **Action**: User clicks "✅ Принимаю" or "❌ Отклоняю".
+        *   "✅ Принимаю":
+            *   Register user in DB (telegram_id, user_type, agreement_accepted=TRUE, timestamp).
+            *   If Employer: "Регистрация завершена! Теперь вы можете публиковать вакансии." (Registration complete! You can now post vacancies.) -> `EMPLOYER_ACTIONS` state.
+            *   If Job Seeker: "Регистрация завершена! Теперь вы можете искать вакансии." (Registration complete! You can now search for vacancies.) -> `JOB_SEEKER_ACTIONS` state.
+        *   "❌ Отклоняю":
+            *   "К сожалению, без принятия соглашения вы не можете использовать бота. Нажмите /start для повторной попытки." (Unfortunately, without accepting the agreement, you cannot use the bot. Press /start to try again.)
+            *   **Conversation State**: End conversation.
+
+4.  **`/help` or `/помощь` (CommandHandler)**
+    *   **Action**: Displays help message with available commands.
+
+5.  **`/cancel` or `/отмена` (CommandHandler)**
+    *   **Action**: Cancels the current operation/conversation. "Действие отменено." (Action cancelled.)
+    *   **Conversation State**: End current conversation, return to base state for the user role.
+
+---
+
+**II. Employer Handlers:**
+
+1.  **Main Menu (CallbackQueryHandler or MessageHandler with text filter)**
+    *   **State**: `EMPLOYER_ACTIONS`
+    *   **Buttons/Commands**:
+        *   "Опубликовать вакансию" (`/post_vacancy` or text) -> `POST_VACANCY_TITLE` state.
+        *   "Мои вакансии" (`/my_vacancies` or text)
+        *   "Просмотреть кандидатов" (`/view_applications` or text)
+
+2.  **Post Vacancy (ConversationHandler)**
+    *   **Entry Point**: "Опубликовать вакансию"
+    *   a. **`POST_VACANCY_TITLE` (MessageHandler - text)**:
+        *   Bot: "Введите название вакансии:" (Enter vacancy title:)
+        *   User: [sends title]
+        *   Next state: `POST_VACANCY_DESCRIPTION`
+    *   b. **`POST_VACANCY_DESCRIPTION` (MessageHandler - text)**:
+        *   Bot: "Введите описание вакансии:" (Enter vacancy description:)
+        *   User: [sends description]
+        *   Next state: `POST_VACANCY_SALARY`
+    *   c. **`POST_VACANCY_SALARY` (MessageHandler - text)**:
+        *   Bot: "Укажите зарплату (например, '50000 руб.' или 'от 80000 до 120000 руб.'):" (Specify salary:)
+        *   User: [sends salary]
+        *   Next state: `POST_VACANCY_CONTACTS`
+    *   d. **`POST_VACANCY_CONTACTS` (MessageHandler - text)**:
+        *   Bot: "Введите контактные данные для этой вакансии (например, Telegram @username или телефон):" (Enter contact details for this vacancy:)
+        *   User: [sends contacts]
+        *   Next state: `POST_VACANCY_CONFIRM`
+    *   e. **`POST_VACANCY_CONFIRM` (MessageHandler - text/CallbackQueryHandler)**:
+        *   Bot: Displays all entered info. "Проверьте данные вакансии: \nНазвание: ...\nОписание: ...\nЗарплата: ...\nКонтакты: ...\n\nВсе верно?" (Verify vacancy details... Is everything correct?)
+        *   Buttons: ["✅ Опубликовать", "✏️ Редактировать", "❌ Отменить"]
+        *   If "✅ Опубликовать": Save vacancy to DB (status `pending_moderation` or `active` if no moderation). "Вакансия опубликована [и отправлена на модерацию]!" (Vacancy published [and sent for moderation]!) -> `EMPLOYER_ACTIONS`
+        *   If "✏️ Редактировать": "Какое поле вы хотите изменить?" (Which field do you want to change?) -> (complex, maybe restart flow or ask field by field) - For simplicity, could just restart: "Хорошо, давайте начнем заново. Введите название вакансии:" -> `POST_VACANCY_TITLE`
+        *   If "❌ Отменить": "Публикация отменена." (Publication cancelled.) -> `EMPLOYER_ACTIONS`
+
+3.  **View My Vacancies (`/my_vacancies`)**
+    *   **Action**: Fetch employer's vacancies from DB. Display as a list.
+    *   Buttons for each vacancy: ["Посмотреть отклики", "Закрыть вакансию", "Редактировать", "Удалить"]
+
+4.  **View Applications for a Vacancy**
+    *   **Action**: User selects a vacancy. Fetch applications for that vacancy. Display applicant info.
+
+5.  **Close Vacancy**
+    *   **Action**: Mark vacancy status as `closed` in DB. Notify applicants (optional).
+
+---
+
+**III. Job Seeker Handlers:**
+
+1.  **Main Menu (CallbackQueryHandler or MessageHandler with text filter)**
+    *   **State**: `JOB_SEEKER_ACTIONS`
+    *   **Buttons/Commands**:
+        *   "Смотреть вакансии" (`/view_vacancies` or text) -> `VIEW_VACANCIES_LIST` state.
+        *   "Мои отклики" (`/my_applications` or text)
+        *   "Фильтр вакансий" (`/filter_vacancies` or text) -> `FILTER_VACANCIES_KEYWORDS` state.
+
+2.  **View Vacancies (`/view_vacancies`)**
+    *   **State**: `VIEW_VACANCIES_LIST`
+    *   **Action**: Fetch active vacancies from DB. Display with pagination (e.g., 5 per message).
+        *   Each vacancy message includes: Title, Salary, Short Description.
+        *   Buttons: ["Подробнее и Откликнуться", "Следующие >>", "<< Предыдущие"]
+    *   If "Подробнее и Откликнуться" for vacancy X:
+        *   Display full vacancy details for X.
+        *   Display Vacancy Application Agreement (Russian). "Для отклика на эту вакансию, пожалуйста, примите условия Соглашения по отклику... Принимаете?" (To apply for this vacancy, please accept the Vacancy Application Agreement... Do you accept?)
+        *   Buttons: ["✅ Принимаю и Откликнуться", "❌ Назад к списку"]
+        *   **Conversation State**: `APPLY_VACANCY_CONFIRM_AGREEMENT` (passing vacancy_id in context)
+
+3.  **Apply to Vacancy - Agreement Confirmation (CallbackQueryHandler)**
+    *   **State**: `APPLY_VACANCY_CONFIRM_AGREEMENT`
+    *   **Action**: User clicks "✅ Принимаю и Откликнуться".
+        *   Bot: "Пожалуйста, отправьте ваше резюме (как файл) или короткое сообщение о себе для работодателя." (Please send your resume (as a file) or a short message about yourself for the employer.)
+        *   **Conversation State**: `APPLY_VACANCY_SUBMIT_INFO`
+    *   If "❌ Назад к списку": Return to `VIEW_VACANCIES_LIST`.
+
+4.  **Apply to Vacancy - Submit Info (MessageHandler - text or document)**
+    *   **State**: `APPLY_VACANCY_SUBMIT_INFO`
+    *   **Action**: User sends message or file.
+        *   Save application to DB (job_seeker_id, vacancy_id, resume/message, vacancy_agreement_accepted=TRUE, timestamp).
+        *   Bot: "Ваш отклик отправлен!" (Your application has been sent!)
+        *   Notify employer about new application.
+        *   **Conversation State**: `JOB_SEEKER_ACTIONS`
+
+5.  **Filter Vacancies (`/filter_vacancies`)**
+    *   **State**: `FILTER_VACANCIES_KEYWORDS`
+    *   **Action**:
+        *   Bot: "Введите ключевые слова для поиска (например, 'python разработчик Москва'):" (Enter keywords for search:)
+        *   User: [sends keywords]
+        *   Store keywords in user session/context.
+        *   Bot: "Фильтр применен. Теперь при просмотре вакансий будут показаны только соответствующие." (Filter applied. Now only matching vacancies will be shown when you browse.)
+        *   Go to `VIEW_VACANCIES_LIST` but with filter applied.
+    *   (Future: Add category filter buttons)
+
+6.  **View My Applications (`/my_applications`)**
+    *   **Action**: Fetch job seeker's applications from DB. Display status (e.g., "Отправлено", "Просмотрено").
+
+---
+
+**IV. Admin Handlers (Simplified):**
+
+1.  **`/admin_login <password>` (CommandHandler - potential, or just by telegram_id if pre-set)**
+    *   **Action**: If password matches or user is a pre-defined admin ID, set user_type to 'admin'.
+    *   "Добро пожаловать, Администратор!" (Welcome, Administrator!) -> `ADMIN_ACTIONS` state.
+
+2.  **Main Menu (CallbackQueryHandler or MessageHandler)**
+    *   **State**: `ADMIN_ACTIONS`
+    *   **Buttons/Commands**:
+        *   "Модерация вакансий" (`/moderate_vacancies` or text)
+        *   "Управление пользователями" (`/manage_users` or text) (Out of scope for initial)
+
+3.  **Moderate Vacancies (`/moderate_vacancies`)**
+    *   **Action**: Fetch vacancies with status `pending_moderation`.
+    *   Display each vacancy with details.
+    *   Buttons: ["✅ Одобрить", "❌ Отклонить (и удалить)", "✏️ Редактировать (сложно, мб просто отклонить и попросить пересоздать)", "Следующая"]
+    *   If "✅ Одобрить": Change status to `active`. Notify employer.
+    *   If "❌ Отклонить": Change status to `rejected` or delete. Notify employer with reason (optional).
+
+---
+
+**V. Notifications (Conceptual - not direct handlers but triggered by actions):**
+
+1.  **New Vacancy Posted (to Job Seekers with matching filters - advanced)**
+    *   For now, seekers find vacancies by browsing. Active notifications are a future step.
+2.  **New Application Received (to Employer)**
+    *   "Новый отклик на вашу вакансию '[Vacancy Title]' от пользователя [User Link]." (New application for your vacancy '[Vacancy Title]' from user [User Link].)
+3.  **Vacancy Approved/Rejected (to Employer after moderation)**
+    *   "Ваша вакансия '[Vacancy Title]' была одобрена." (Your vacancy '[Vacancy Title]' has been approved.)
+    *   "Ваша вакансия '[Vacancy Title]' была отклонена. Причина: ..." (Your vacancy '[Vacancy Title]' has been rejected. Reason: ...)
+4.  **Application Viewed (to Job Seeker - advanced)**
+    *   "Работодатель просмотрел ваш отклик на вакансию '[Vacancy Title]'." (The employer has viewed your application for vacancy '[Vacancy Title]'.)
+
+---
+
+This design outlines the primary interactions and states. Error handling, more detailed editing flows, and advanced filtering/notifications would be built upon this base.
+The use of `ConversationHandler` in `python-telegram-bot` will be key to managing multi-step processes like registration and vacancy posting.
+User language is Russian throughout.
+Callbacks will use data strings like `role_employer`, `role_job_seeker`, `accept_general_agreement`, `decline_general_agreement`, `apply_vacancy_X_accept_agreement`, `apply_vacancy_X_decline_agreement`.
