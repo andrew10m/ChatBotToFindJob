@@ -3,26 +3,24 @@ import os
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_FALLBACK_TOKEN_HERE") # Replace with your bot token
 DATABASE_URL = "job_bot.db" # SQLite database file
 ADMIN_TELEGRAM_IDS = [123456789] # Replace with actual admin Telegram IDs
+ADMIN_PASSWORD = "your_secret_admin_password" # IMPORTANT: Change this and ideally use a HASH!
 
 # For pagination
 VACANCIES_PER_PAGE = 5
 
-# Conversation states (can be defined here or in the main bot file)
-# These are just examples, you might use integers or more descriptive strings
-CHOOSE_ROLE, REGISTER_AGREEMENT, POST_VACANCY_FLOW, APPLY_FLOW = range(4)
-
 # Placeholder texts for agreements (in Russian)
 # IMPORTANT: These are placeholders. Consult a legal professional for actual text.
+# Text for agreements remains largely the same but "Соискатель" will be replaced by "Работник" in usage.
 GENERAL_USER_AGREEMENT_TEXT = """
 **Общее Пользовательское Соглашение**
 
 1.  **Общие положения**
-    1.1. Настоящее Пользовательское соглашение (далее – «Соглашение») регулирует отношения между владельцем бота «JobLink Helper» (далее – «Платформа») и Пользователем (Работодателем или Соискателем).
-    1.2. Платформа предоставляет техническую возможность для размещения вакансий Работодателями и поиска вакансий Соискателями.
+    1.1. Настоящее Пользовательское соглашение (далее – «Соглашение») регулирует отношения между владельцем бота «JobLink Helper» (далее – «Платформа») и Пользователем (Работодателем или Работником).
+    1.2. Платформа предоставляет техническую возможность для размещения вакансий Работодателями и поиска вакансий Работниками.
     1.3. Регистрируясь в боте, Пользователь полностью и безоговорочно принимает условия настоящего Соглашения. Если Пользователь не согласен с условиями Соглашения, он не должен использовать Платформу.
 
 2.  **Предмет Соглашения**
-    2.1. Платформа является исключительно информационным посредником, облегчающим контакт между Работодателями и Соискателями.
+    2.1. Платформа является исключительно информационным посредником, облегчающим контакт между Работодателями и Работниками.
     2.2. Платформа не является стороной каких-либо трудовых или иных договоров, заключаемых между Пользователями. Все договоренности достигаются и исполняются Пользователями самостоятельно и под свою ответственность.
 
 3.  **Права и обязанности Сторон**
@@ -33,7 +31,7 @@ GENERAL_USER_AGREEMENT_TEXT = """
 
 4.  **Ответственность и ограничение ответственности**
     4.1. Платформа не несет ответственности за любые споры, убытки, ущерб (включая моральный вред), возникшие в результате взаимодействия Пользователей, включая, но не ограничиваясь, вопросы неоплаты услуг, производственных травм, краж, мошенничества или иных противоправных действий.
-    4.2. Платформа не гарантирует трудоустройство Соискателей или нахождение подходящих кандидатов Работодателями.
+    4.2. Платформа не гарантирует трудоустройство Работников или нахождение подходящих кандидатов Работодателями.
     4.3. Платформа предоставляется «как есть». Владелец Платформы не несет ответственности за временные сбои и перерывы в работе Платформы.
 
 5.  **Обработка персональных данных**
@@ -51,7 +49,7 @@ GENERAL_USER_AGREEMENT_TEXT = """
 VACANCY_APPLICATION_AGREEMENT_TEXT = """
 **Соглашение по Отклику на Вакансию**
 
-1.  Настоящим я, Соискатель, подтверждаю свое намерение откликнуться на выбранную вакансию через платформу «JobLink Helper».
+1.  Настоящим я, Работник, подтверждаю свое намерение откликнуться на выбранную вакансию через платформу «JobLink Helper».
 2.  Я понимаю и соглашаюсь с тем, что платформа «JobLink Helper» является лишь информационным посредником и не является моим работодателем или агентом.
 3.  Все условия потенциального трудоустройства, включая, но не ограничиваясь, оплату труда, условия работы, должностные обязанности, социальные гарантии и безопасность на рабочем месте, обсуждаются и согласовываются исключительно между мной и Работодателем, разместившим вакансию.
 4.  Платформа «JobLink Helper» и ее владелец не несут ответственности за:
@@ -68,10 +66,11 @@ VACANCY_APPLICATION_AGREEMENT_TEXT = """
 (
     CHOOSE_ROLE,
     REGISTER_EMPLOYER_AGREEMENT,
-    REGISTER_JOB_SEEKER_AGREEMENT,
+    REGISTER_EMPLOYEE_AGREEMENT, # Changed from JOB_SEEKER
     EMPLOYER_ACTIONS,
-    JOB_SEEKER_ACTIONS,
+    EMPLOYEE_ACTIONS, # Changed from JOB_SEEKER
     ADMIN_ACTIONS,
+    ADMIN_PASSWORD_ENTRY, # New state for admin password
     POST_VACANCY_TITLE,
     POST_VACANCY_DESCRIPTION,
     POST_VACANCY_SALARY,
@@ -81,21 +80,22 @@ VACANCY_APPLICATION_AGREEMENT_TEXT = """
     APPLY_VACANCY_CONFIRM_AGREEMENT,
     APPLY_VACANCY_SUBMIT_INFO,
     FILTER_VACANCIES_KEYWORDS,
-    MODERATE_VACANCY_ID,
-    CONFIRM_GENERAL_AGREEMENT # General agreement confirmation state
-) = range(17) # Ensure this number matches the number of states
+    MODERATE_VACANCY_ID, # This might be part of ADMIN_ACTIONS rather than a global state
+    CONFIRM_GENERAL_AGREEMENT
+) = range(18) # Increased range for new state
 
 # Callback data prefixes
 CALLBACK_ROLE_EMPLOYER = "role_employer"
-CALLBACK_ROLE_JOB_SEEKER = "role_job_seeker"
+CALLBACK_ROLE_EMPLOYEE = "role_employee" # Changed from job_seeker
+CALLBACK_ROLE_ADMIN = "role_admin" # New callback for admin role
 CALLBACK_ACCEPT_GENERAL_AGREEMENT = "accept_general_agreement"
 CALLBACK_DECLINE_GENERAL_AGREEMENT = "decline_general_agreement"
 CALLBACK_POST_VACANCY = "post_vacancy"
 CALLBACK_MY_VACANCIES = "my_vacancies"
-CALLBACK_VIEW_APPLICATIONS = "view_applications_employer" # More specific
-CALLBACK_VIEW_VACANCIES_JS = "view_vacancies_js"
-CALLBACK_MY_APPLICATIONS_JS = "my_applications_js"
-CALLBACK_FILTER_VACANCIES_JS = "filter_vacancies_js"
+CALLBACK_VIEW_APPLICATIONS = "view_applications_employer"
+CALLBACK_VIEW_VACANCIES_EMP = "view_vacancies_employee" # Changed from JS
+CALLBACK_MY_APPLICATIONS_EMP = "my_applications_employee" # Changed from JS
+CALLBACK_FILTER_VACANCIES_EMP = "filter_vacancies_employee" # Changed from JS
 CALLBACK_VACANCY_DETAILS_PREFIX = "vac_details_"
 CALLBACK_VACANCY_APPLY_PREFIX = "vac_apply_"
 CALLBACK_ACCEPT_VACANCY_AGREEMENT = "accept_vac_agreement_" # Append vacancy_id
@@ -116,17 +116,21 @@ CALLBACK_REJECT_VACANCY = "admin_reject_vac_" # Append vacancy_id
 TEXTS_RU = {
     "welcome_new_user": "Добро пожаловать! Пожалуйста, выберите вашу роль:",
     "welcome_back_employer": "С возвращением, Работодатель! Что бы вы хотели сделать?",
-    "welcome_back_job_seeker": "С возвращением, Соискатель! Что бы вы хотели сделать?",
+    "welcome_back_employee": "С возвращением, Работник! Что бы вы хотели сделать?", # Changed
     "welcome_admin": "Панель администратора.",
+    "admin_login_prompt": "Введите пароль администратора:", # New
+    "admin_login_success": "Вход в режим администратора выполнен успешно!", # New
+    "admin_login_fail": "Неверный пароль. Попробуйте еще раз или нажмите /cancel.", # New
     "role_selection_prompt": "Кто вы?",
     "employer_button": "Я Работодатель",
-    "job_seeker_button": "Я Соискатель",
+    "employee_button": "Я Работник", # Changed
+    "admin_button": "Я Администратор", # New
     "general_agreement_prompt": "Пожалуйста, ознакомьтесь с Пользовательским соглашением и примите его условия для продолжения.",
     "accept_button": "✅ Принимаю",
     "decline_button": "❌ Отклоняю",
     "agreement_declined_message": "К сожалению, без принятия соглашения вы не можете использовать бота. Нажмите /start для повторной попытки.",
     "registration_complete_employer": "Регистрация как Работодатель завершена! Теперь вы можете публиковать вакансии.",
-    "registration_complete_job_seeker": "Регистрация как Соискатель завершена! Теперь вы можете искать вакансии.",
+    "registration_complete_employee": "Регистрация как Работник завершена! Теперь вы можете искать вакансии.", # Changed
     "action_canceled": "Действие отменено.",
     "help_message": "Доступные команды:\n/start - Начать/перезапустить бота\n/help - Показать это сообщение\n/cancel - Отменить текущее действие",
 
@@ -135,7 +139,7 @@ TEXTS_RU = {
     "my_vacancies_button": "Мои вакансии",
     "view_applications_button": "Просмотреть отклики",
 
-    "job_seeker_menu_prompt": "Меню Соискателя:",
+    "employee_menu_prompt": "Меню Работника:", # Changed
     "view_vacancies_button": "Смотреть вакансии",
     "my_applications_button": "Мои отклики",
     "filter_vacancies_button": "Фильтр вакансий",

@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     telegram_id INTEGER UNIQUE NOT NULL,
-    user_type TEXT NOT NULL CHECK (user_type IN ('employer', 'job_seeker', 'admin')), -- employer, job_seeker, admin
+    user_type TEXT NOT NULL CHECK (user_type IN ('employer', 'employee', 'admin')), -- employer, employee, admin
     username TEXT, -- Telegram username, if available
     first_name TEXT,
     last_name TEXT,
@@ -27,13 +27,13 @@ CREATE TABLE IF NOT EXISTS vacancies (
 -- Applications Table
 CREATE TABLE IF NOT EXISTS applications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_seeker_id INTEGER NOT NULL,
+    employee_id INTEGER NOT NULL, -- Changed from job_seeker_id
     vacancy_id INTEGER NOT NULL,
     resume_or_message TEXT, -- Could be path to a file or text message
     application_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     vacancy_agreement_accepted BOOLEAN DEFAULT FALSE,
     vacancy_agreement_timestamp DATETIME,
-    FOREIGN KEY (job_seeker_id) REFERENCES users (id),
+    FOREIGN KEY (employee_id) REFERENCES users (id), -- Changed from job_seeker_id
     FOREIGN KEY (vacancy_id) REFERENCES vacancies (id)
 );
 

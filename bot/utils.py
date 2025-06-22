@@ -181,22 +181,22 @@ def update_vacancy_status(vacancy_id: int, status: str):
         conn.close()
 
 # --- Application Management ---
-def create_application(job_seeker_id: int, vacancy_id: int, resume_or_message: str, agreement_accepted: bool) -> int:
+def create_application(employee_id: int, vacancy_id: int, resume_or_message: str, agreement_accepted: bool) -> int: # Renamed job_seeker_id to employee_id
     """Creates a new job application."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         timestamp = datetime.now() if agreement_accepted else None
         cursor.execute("""
-            INSERT INTO applications (job_seeker_id, vacancy_id, resume_or_message, vacancy_agreement_accepted, vacancy_agreement_timestamp, application_timestamp)
+            INSERT INTO applications (employee_id, vacancy_id, resume_or_message, vacancy_agreement_accepted, vacancy_agreement_timestamp, application_timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (job_seeker_id, vacancy_id, resume_or_message, agreement_accepted, timestamp, datetime.now()))
+        """, (employee_id, vacancy_id, resume_or_message, agreement_accepted, timestamp, datetime.now())) # Renamed job_seeker_id to employee_id
         conn.commit()
         application_id = cursor.lastrowid
-        logger.info(f"Application created for vacancy {vacancy_id} by job_seeker_id {job_seeker_id}. DB ID: {application_id}")
+        logger.info(f"Application created for vacancy {vacancy_id} by employee_id {employee_id}. DB ID: {application_id}") # Renamed job_seeker_id to employee_id
         return application_id
     except sqlite3.Error as e:
-        logger.error(f"Error creating application for vacancy {vacancy_id}: {e}")
+        logger.error(f"Error creating application for vacancy {vacancy_id} by employee_id {employee_id}: {e}") # Renamed job_seeker_id to employee_id
         return None
     finally:
         conn.close()
@@ -207,9 +207,9 @@ def get_applications_for_vacancy(vacancy_id: int):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT a.*, u.username as seeker_username, u.first_name as seeker_first_name
+            SELECT a.*, u.username as employee_username, u.first_name as employee_first_name  -- Renamed seeker_... to employee_...
             FROM applications a
-            JOIN users u ON a.job_seeker_id = u.id
+            JOIN users u ON a.employee_id = u.id -- Renamed job_seeker_id to employee_id
             WHERE a.vacancy_id = ?
             ORDER BY a.application_timestamp DESC
         """, (vacancy_id,))
@@ -230,13 +230,13 @@ def get_user_applications(job_seeker_id: int):
             SELECT a.*, v.title as vacancy_title
             FROM applications a
             JOIN vacancies v ON a.vacancy_id = v.id
-            WHERE a.job_seeker_id = ?
+            WHERE a.employee_id = ? -- Renamed job_seeker_id to employee_id
             ORDER BY a.application_timestamp DESC
-        """, (job_seeker_id,))
+        """, (job_seeker_id,)) # Parameter name job_seeker_id kept for clarity in function signature, but refers to employee_id in DB
         applications = cursor.fetchall()
         return applications
     except sqlite3.Error as e:
-        logger.error(f"Error retrieving applications for job_seeker_id {job_seeker_id}: {e}")
+        logger.error(f"Error retrieving applications for employee_id {job_seeker_id}: {e}") # Renamed job_seeker_id to employee_id
         return []
     finally:
         conn.close()
