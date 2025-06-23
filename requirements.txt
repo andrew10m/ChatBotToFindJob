@@ -1,0 +1,10 @@
+aiogram>=3.3.0
+python-dotenv>=1.0.0
+aiosqlite>=0.19.0
+# SQLAlchemy>=2.0.0 # Если будем использовать
+# asyncpg>=0.28.0 # Для PostgreSQL, если будем использовать
+# Flask>=2.0.0 # Если будем делать веб-админку
+# environs # Альтернатива python-dotenv, если потребуется
+
+# Для FSM с Redis (опционально)
+# redis>=4.0.0
