@@ -1,0 +1,166 @@
+## Telegram Bot Handlers and Conversation Flow Design (Russian Language Interface)
+
+**Libraries**: `python-telegram-bot`
+
+**States for ConversationHandler**:
+- `CHOOSE_ROLE`
+- `EMPLOYER_ACTIONS`
+- `EMPLOYEE_ACTIONS` # Changed from JOB_SEEKER_ACTIONS
+- `ADMIN_ACTIONS`
+- `ADMIN_PASSWORD_ENTRY` # New
+- `REGISTER_EMPLOYER_AGREEMENT`
+- `REGISTER_EMPLOYEE_AGREEMENT` # Changed from REGISTER_JOB_SEEKER_AGREEMENT
+- `CONFIRM_GENERAL_AGREEMENT` # Combined state for employer/employee agreement
+- `POST_VACANCY_TITLE`
+- `POST_VACANCY_DESCRIPTION`
+- `POST_VACANCY_SALARY`
+- `POST_VACANCY_CONTACTS`
+- `POST_VACANCY_CONFIRM`
+- `VIEW_VACANCIES_LIST`
+- `APPLY_VACANCY_CONFIRM_AGREEMENT`
+- `APPLY_VACANCY_SUBMIT_INFO`
+- `FILTER_VACANCIES_KEYWORDS`
+- `MODERATE_VACANCY_ID` # Potentially part of admin flow, not global state
+
+---
+
+**I. General Commands & Handlers:**
+
+1.  **`/start` or `/старт` (CommandHandler)**
+    *   **Action**: Greets the user. Checks if the user exists in the DB.
+        *   If new user: "Добро пожаловать! Пожалуйста, выберите вашу роль:" (Welcome! Please choose your role:) -> `CHOOSE_ROLE` state.
+            *   Buttons: ["Я Работодатель", "Я Работник", "Я Администратор"]
+        *   If existing user (role chosen):
+            *   Employer: "С возвращением, Работодатель! Что бы вы хотели сделать?" -> `EMPLOYER_ACTIONS` state (or end conv, show main menu).
+                *   Buttons: ["Опубликовать вакансию", "Мои вакансии", "Просмотреть кандидатов"]
+            *   Работник (Employee): "С возвращением, Работник! Что бы вы хотели сделать?" -> `EMPLOYEE_ACTIONS` state (or end conv, show main menu).
+                *   Buttons: ["Смотреть вакансии", "Мои отклики", "Фильтр вакансий"]
+            *   Admin: "Панель администратора." -> `ADMIN_ACTIONS` state (or end conv, show main menu).
+                *   Buttons: ["Модерация вакансий", "Управление пользователями"]
+    *   **Conversation State**: Transitions to `CHOOSE_ROLE` or ends (if user is known and menu is shown).
+
+2.  **Role Selection (CallbackQueryHandler from `/start` for new users)**
+    *   **State**: `CHOOSE_ROLE`
+    *   **Action**: User clicks "Я Работодатель", "Я Работник", or "Я Администратор".
+        *   "Я Работодатель" or "Я Работник":
+            *   Display General User Agreement (Russian). "Пожалуйста, ознакомьтесь с Пользовательским соглашением... Принимаете условия?"
+            *   Buttons: ["✅ Принимаю", "❌ Отклоняю"]
+            *   **Conversation State**: `CONFIRM_GENERAL_AGREEMENT` (stores chosen role in `context.user_data`)
+        *   "Я Администратор":
+            *   Bot: "Введите пароль администратора:"
+            *   **Conversation State**: `ADMIN_PASSWORD_ENTRY`
+
+3.  **Admin Password Entry (MessageHandler - text)**
+    *   **State**: `ADMIN_PASSWORD_ENTRY`
+    *   **Action**: User sends password.
+        *   If password correct:
+            *   Create/update user as 'admin'. Mark general agreement as accepted (implicitly or explicitly if needed for admins).
+            *   Bot: "Вход в режим администратора выполнен успешно!"
+            *   Show Admin Main Menu. -> End Conversation or to `ADMIN_ACTIONS`.
+        *   If password incorrect:
+            *   Bot: "Неверный пароль. Попробуйте еще раз или нажмите /cancel."
+            *   Remain in `ADMIN_PASSWORD_ENTRY` state or end.
+
+4.  **General Agreement Acceptance (CallbackQueryHandler for Employer/Employee)**
+    *   **State**: `CONFIRM_GENERAL_AGREEMENT`
+    *   **Action**: User clicks "✅ Принимаю" or "❌ Отклоняю".
+        *   "✅ Принимаю":
+            *   Retrieve chosen role (employer/employee) from `context.user_data`.
+            *   Register user in DB (telegram_id, user_type, agreement_accepted=TRUE, timestamp).
+            *   If Employer: "Регистрация как Работодатель завершена! Теперь вы можете публиковать вакансии." -> End Conversation or to `EMPLOYER_ACTIONS`.
+            *   If Работник: "Регистрация как Работник завершена! Теперь вы можете искать вакансии." -> End Conversation or to `EMPLOYEE_ACTIONS`.
+        *   "❌ Отклоняю":
+            *   "К сожалению, без принятия соглашения вы не можете использовать бота. Нажмите /start для повторной попытки."
+            *   **Conversation State**: End conversation.
+
+5.  **`/help` or `/помощь` (CommandHandler)**
+    *   **Action**: Displays help message with available commands.
+
+6.  **`/cancel` or `/отмена` (CommandHandler)**
+    *   **Action**: Cancels the current operation/conversation. "Действие отменено."
+    *   **Conversation State**: End current conversation, return to base state for the user role (if known) or prompt /start.
+
+---
+
+**II. Employer Handlers:** (Largely unchanged, "Соискатель" in notifications becomes "Работник")
+
+1.  **Main Menu**
+    *   State: `EMPLOYER_ACTIONS` (or direct commands if conv ended)
+    *   Buttons/Commands: ["Опубликовать вакансию", "Мои вакансии", "Просмотреть отклики"]
+
+2.  **Post Vacancy (ConversationHandler)**: `POST_VACANCY_TITLE` -> `POST_VACANCY_DESCRIPTION` -> `POST_VACANCY_SALARY` -> `POST_VACANCY_CONTACTS` -> `POST_VACANCY_CONFIRM`
+    *   ... (details as before)
+    *   Notification to admins: "Новая вакансия для модерации..."
+
+---
+
+**III. Работник (Employee) Handlers:** (Replaces Job Seeker Handlers)
+
+1.  **Main Menu**
+    *   State: `EMPLOYEE_ACTIONS` (or direct commands if conv ended)
+    *   Buttons/Commands: ["Смотреть вакансии", "Мои отклики", "Фильтр вакансий"]
+
+2.  **View Vacancies (`/view_vacancies` or button)**
+    *   State: `VIEW_VACANCIES_LIST`
+    *   Action: Fetch active vacancies. Display with pagination.
+        *   Each vacancy: Title, Salary, Short Description.
+        *   Buttons: ["Подробнее и Откликнуться", "Следующие >>", "<< Предыдущие"]
+    *   If "Подробнее и Откликнуться":
+        *   Display full vacancy details.
+        *   Display Vacancy Application Agreement (Russian, text updated to "Работник"). "Для отклика на эту вакансию, пожалуйста, примите условия Соглашения по отклику..."
+        *   Buttons: ["✅ Принимаю и Откликнуться", "❌ Назад к списку"]
+        *   Conversation State: `APPLY_VACANCY_CONFIRM_AGREEMENT`
+
+3.  **Apply to Vacancy - Agreement Confirmation (CallbackQueryHandler)**
+    *   State: `APPLY_VACANCY_CONFIRM_AGREEMENT`
+    *   Action: User clicks "✅ Принимаю и Откликнуться".
+        *   Bot: "Пожалуйста, отправьте ваше резюме (как файл) или короткое сообщение о себе для работодателя."
+        *   Conversation State: `APPLY_VACANCY_SUBMIT_INFO`
+    *   If "❌ Назад к списку": Return to `VIEW_VACANCIES_LIST`.
+
+4.  **Apply to Vacancy - Submit Info (MessageHandler - text or document)**
+    *   State: `APPLY_VACANCY_SUBMIT_INFO`
+    *   Action: User sends message or file.
+        *   Save application to DB (employee_id, vacancy_id, resume/message, vacancy_agreement_accepted=TRUE, timestamp).
+        *   Bot: "Ваш отклик отправлен!"
+        *   Notify employer.
+        *   Conversation State: `EMPLOYEE_ACTIONS` (or end conv).
+
+5.  **Filter Vacancies (`/filter_vacancies` or button)**
+    *   State: `FILTER_VACANCIES_KEYWORDS`
+    *   ... (details as before)
+
+6.  **View My Applications (`/my_applications` or button)**
+    *   Action: Fetch employee's applications from DB.
+
+---
+
+**IV. Admin Handlers:**
+
+1.  **Entry**: Via `/start` -> "Я Администратор" -> `ADMIN_PASSWORD_ENTRY` (as described in Section I).
+    Or, if already logged in as admin, `/start` directly shows admin menu.
+
+2.  **Main Menu**
+    *   State: `ADMIN_ACTIONS` (or direct commands)
+    *   Buttons/Commands: ["Модерация вакансий", "Управление пользователями (TBD)"]
+
+3.  **Moderate Vacancies (`/moderate_vacancies` or button)**
+    *   Action: Fetch `pending_moderation` vacancies. Display one by one.
+    *   Buttons for each: ["✅ Одобрить", "❌ Отклонить", "Следующая"]
+    *   Callbacks handle status update and notify employer. Then show next pending or "нет вакансий для модерации".
+
+---
+
+**V. Notifications (Conceptual):**
+*   "Соискатель" changed to "Работник" where applicable in notification texts.
+*   Admin notification for new vacancy pending moderation.
+*   Employer notification on new application from Работник.
+*   Employer notification on vacancy approval/rejection.
+
+---
+
+This design reflects the new "Работник" role and the admin login flow.
+Callbacks will use updated data strings like `role_employee`, `role_admin`.
+States in `config.py` and `main.py` need to be aligned with this.
+Database `user_type` enum will be `('employer', 'employee', 'admin')`.
+`applications` table will use `employee_id`.

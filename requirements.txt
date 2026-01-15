@@ -1,0 +1,4 @@
+python-telegram-bot>=20.0
+# cryptography - often a dependency of PTB for certain features, good to have explicitly if needed
+# requests - if making direct HTTP calls, PTB usually handles this.
+# python-dotenv - if using .env files for configuration (good practice)
